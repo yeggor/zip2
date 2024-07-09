@@ -869,6 +869,13 @@ impl<W: Write + Seek> ZipWriter<W> {
     {
         self.finish_file()?;
 
+        let mut options = options;
+
+        // if the header start implies zip64 and large_file is not set, let's set it...
+        if self.inner.get_plain().stream_position()? >= spec::ZIP64_BYTES_THR {
+            options = options.large_file(true);
+        }
+
         let raw_values = raw_values.unwrap_or(ZipRawValues {
             crc32: 0,
             compressed_size: 0,
