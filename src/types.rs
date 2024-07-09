@@ -780,7 +780,7 @@ impl ZipFileData {
         let uncompressed_size: u32 = self.clamp_size_field(self.uncompressed_size);
 
         let extra_block_len: usize = self
-            .zip64_extra_field_block()
+            .zip64_extra_field_block(true)
             .map(|block| block.full_size())
             .unwrap_or(0);
         let extra_field_length: u16 = (self.extra_field_len() + extra_block_len)
@@ -821,16 +821,8 @@ impl ZipFileData {
             last_mod_time: last_modified_time.timepart(),
             last_mod_date: last_modified_time.datepart(),
             crc32: self.crc32,
-            compressed_size: self
-                .compressed_size
-                .min(spec::ZIP64_BYTES_THR)
-                .try_into()
-                .unwrap(),
-            uncompressed_size: self
-                .uncompressed_size
-                .min(spec::ZIP64_BYTES_THR)
-                .try_into()
-                .unwrap(),
+            compressed_size: self.clamp_size_field(self.compressed_size),
+            uncompressed_size: self.clamp_size_field(self.uncompressed_size),
             file_name_length: self.file_name_raw.len().try_into().unwrap(),
             extra_field_length: zip64_extra_field_length
                 .checked_add(extra_field_len + central_extra_field_len)
@@ -849,46 +841,56 @@ impl ZipFileData {
         })
     }
 
-    pub(crate) fn zip64_extra_field_block(&self) -> Option<Zip64ExtraFieldBlock> {
-        let uncompressed_size: Option<u64> =
-            if self.uncompressed_size >= spec::ZIP64_BYTES_THR || self.large_file {
-                Some(self.uncompressed_size)
-            } else {
-                None
-            };
-        let compressed_size: Option<u64> =
-            if self.compressed_size >= spec::ZIP64_BYTES_THR || self.large_file {
-                Some(self.compressed_size)
-            } else {
-                None
-            };
-        let header_start: Option<u64> = if self.header_start >= spec::ZIP64_BYTES_THR {
-            Some(self.header_start)
+    pub(crate) fn zip64_extra_field_block(&self, is_local: bool) -> Option<Zip64ExtraFieldBlock> {
+        if is_local && self.large_file {
+            Some(Zip64ExtraFieldBlock {
+                magic: spec::ExtraFieldMagic::ZIP64_EXTRA_FIELD_TAG,
+                size: 16,
+                uncompressed_size: Some(self.uncompressed_size),
+                compressed_size: Some(self.compressed_size),
+                header_start: None,
+            })
         } else {
-            None
-        };
+            let uncompressed_size: Option<u64> =
+                if self.uncompressed_size >= spec::ZIP64_BYTES_THR || self.large_file {
+                    Some(self.uncompressed_size)
+                } else {
+                    None
+                };
+            let compressed_size: Option<u64> =
+                if self.compressed_size >= spec::ZIP64_BYTES_THR || self.large_file {
+                    Some(self.compressed_size)
+                } else {
+                    None
+                };
+            let header_start: Option<u64> = if self.header_start >= spec::ZIP64_BYTES_THR {
+                Some(self.header_start)
+            } else {
+                None
+            };
 
-        let mut size: u16 = 0;
-        if uncompressed_size.is_some() {
-            size += mem::size_of::<u64>() as u16;
-        }
-        if compressed_size.is_some() {
-            size += mem::size_of::<u64>() as u16;
-        }
-        if header_start.is_some() {
-            size += mem::size_of::<u64>() as u16;
-        }
-        if size == 0 {
-            return None;
-        }
+            let mut size: u16 = 0;
+            if uncompressed_size.is_some() {
+                size += mem::size_of::<u64>() as u16;
+            }
+            if compressed_size.is_some() {
+                size += mem::size_of::<u64>() as u16;
+            }
+            if header_start.is_some() {
+                size += mem::size_of::<u64>() as u16;
+            }
+            if size == 0 {
+                return None;
+            }
 
-        Some(Zip64ExtraFieldBlock {
-            magic: spec::ExtraFieldMagic::ZIP64_EXTRA_FIELD_TAG,
-            size,
-            uncompressed_size,
-            compressed_size,
-            header_start,
-        })
+            Some(Zip64ExtraFieldBlock {
+                magic: spec::ExtraFieldMagic::ZIP64_EXTRA_FIELD_TAG,
+                size,
+                uncompressed_size,
+                compressed_size,
+                header_start,
+            })
+        }
     }
 }
 

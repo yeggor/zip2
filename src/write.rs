@@ -1488,7 +1488,8 @@ impl<W: Write + Seek> ZipWriter<W> {
             write_central_directory_header(writer, file)?;
             version_needed = version_needed.max(file.version_needed());
         }
-        let central_size = writer.stream_position()? - central_start;
+        let central_end = writer.stream_position()?;
+        let central_size = central_end - central_start;
 
         if self.files.len() > spec::ZIP64_ENTRY_THR
             || central_size.max(central_start) > spec::ZIP64_BYTES_THR
@@ -1508,7 +1509,7 @@ impl<W: Write + Seek> ZipWriter<W> {
 
             let zip64_footer = spec::Zip64CentralDirectoryEndLocator {
                 disk_with_central_directory: 0,
-                end_of_central_directory_offset: central_start + central_size,
+                end_of_central_directory_offset: central_end,
                 number_of_disks: 1,
             };
 
@@ -1906,7 +1907,7 @@ fn write_central_directory_header<T: Write>(writer: &mut T, file: &ZipFileData) 
 fn write_local_zip64_extra_field<T: Write>(writer: &mut T, file: &ZipFileData) -> ZipResult<()> {
     // This entry in the Local header MUST include BOTH original
     // and compressed file size fields.
-    let Some(block) = file.zip64_extra_field_block() else {
+    let Some(block) = file.zip64_extra_field_block(true) else {
         return Err(ZipError::InvalidArchive(
             "Attempted to write a ZIP64 extra field for a file that's within zip32 limits",
         ));
@@ -1932,7 +1933,7 @@ fn update_local_zip64_extra_field<T: Write + Seek>(
 
     writer.seek(SeekFrom::Start(zip64_extra_field))?;
 
-    let block = file.zip64_extra_field_block().unwrap();
+    let block = file.zip64_extra_field_block(true).unwrap();
     let block = block.serialize();
     writer.write_all(&block)?;
     Ok(())
@@ -1943,7 +1944,7 @@ fn write_central_zip64_extra_field<T: Write>(writer: &mut T, file: &ZipFileData)
     // information record is fixed, but the fields MUST
     // only appear if the corresponding Local or Central
     // directory record field is set to 0xFFFF or 0xFFFFFFFF.
-    match file.zip64_extra_field_block() {
+    match file.zip64_extra_field_block(false) {
         None => Ok(0),
         Some(block) => {
             let block = block.serialize();
