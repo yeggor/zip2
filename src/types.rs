@@ -852,18 +852,18 @@ impl ZipFileData {
     pub(crate) fn zip64_extra_field_block(&self) -> Option<Zip64ExtraFieldBlock> {
         let uncompressed_size: Option<u64> =
             if self.uncompressed_size >= spec::ZIP64_BYTES_THR || self.large_file {
-                Some(spec::ZIP64_BYTES_THR)
+                Some(self.uncompressed_size)
             } else {
                 None
             };
         let compressed_size: Option<u64> =
             if self.compressed_size >= spec::ZIP64_BYTES_THR || self.large_file {
-                Some(spec::ZIP64_BYTES_THR)
+                Some(self.compressed_size)
             } else {
                 None
             };
         let header_start: Option<u64> = if self.header_start >= spec::ZIP64_BYTES_THR {
-            Some(spec::ZIP64_BYTES_THR)
+            Some(self.header_start)
         } else {
             None
         };
