@@ -65,7 +65,7 @@ impl <'k> Debug for FileOperation<'k> {
             BasicFileOperation::WriteNormalFile {contents, options} => {
                 f.write_fmt(format_args!("let options = {:?};\n\
                 writer.start_file_from_path({:?}, options)?;\n", options, self.path))?;
-                for content_slice in contents {
+                for content_slice in contents.iter() {
                     f.write_fmt(format_args!("writer.write_all(&({:?}))?;\n", content_slice))?;
                 }
             },

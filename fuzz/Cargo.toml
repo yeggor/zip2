@@ -10,7 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-arbitrary = { version = "1.3.2", features = ["derive"] }
+arbitrary = { version = "1", features = ["derive"] }
 replace_with = "0.1.7"
 tikv-jemallocator = "0.5.4"
 
@@ -35,5 +35,11 @@ doc = false
 [[bin]]
 name = "fuzz_write"
 path = "fuzz_targets/fuzz_write.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_write_minimal"
+path = "fuzz_targets/fuzz_write_minimal.rs"
 test = false
 doc = false
